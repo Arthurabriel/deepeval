@@ -1,2 +1,3 @@
 deepeval
 openai
+python-dotenv

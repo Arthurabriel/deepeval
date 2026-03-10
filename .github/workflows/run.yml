@@ -27,12 +27,6 @@ jobs:
         working-directory: src
         run: mkdir -p results
 
-      - name: Optimize prompt (generates results/optimized_prompt.json)
-        working-directory: src
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: python optimize_prompt.py
-
       - name: Run experiment
         working-directory: src
         env:

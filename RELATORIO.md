@@ -158,7 +158,6 @@ deepeval/
 │   ├── dataset.py           ← Dataset golden com perguntas e respostas esperadas
 │   ├── knowledge_base.py    ← Base de conhecimento com chunks de V&V
 │   ├── prompts.py           ← Configuração dos 4 prompts comparados
-│   ├── optimize_prompt.py   ← Otimizador automático de prompt (DeepEval)
 │   ├── test_run_experiment.py  ← Experimento de comparação de prompts
 │   ├── test_run_security.py    ← Testes de segurança (prompt injection)
 │   └── results/
@@ -189,13 +188,10 @@ OPENAI_API_KEY=sk-...
 ```bash
 cd src
 
-# 1. Gerar o prompt otimizado (necessário antes do experimento)
-python optimize_prompt.py
-
-# 2. Comparar os 4 prompts
+# Comparar os 4 prompts
 python test_run_experiment.py
 
-# 3. Testar resistência a prompt injection
+# Testar resistência a prompt injection
 python test_run_security.py
 ```
 

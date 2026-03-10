@@ -1,0 +1,30 @@
+{
+  "Prompt 1 — Simples": {
+    "Answer Relevancy": 1.0,
+    "Faithfulness": 0.967,
+    "Hallucination": 0.352,
+    "Contextual Recall": 0.889,
+    "Contextual Precision": 0.815
+  },
+  "Prompt 2 — Alta Temperatura": {
+    "Answer Relevancy": 0.889,
+    "Faithfulness": 0.574,
+    "Hallucination": 0.778,
+    "Contextual Recall": 0.889,
+    "Contextual Precision": 0.815
+  },
+  "Prompt 3 — Padrão da Indústria": {
+    "Answer Relevancy": 0.889,
+    "Faithfulness": 0.9,
+    "Hallucination": 0.463,
+    "Contextual Recall": 0.889,
+    "Contextual Precision": 0.815
+  },
+  "Prompt 4 — Otimizado pelo DeepEval": {
+    "Answer Relevancy": 0.844,
+    "Faithfulness": 0.826,
+    "Hallucination": 0.407,
+    "Contextual Recall": 0.889,
+    "Contextual Precision": 0.815
+  }
+}

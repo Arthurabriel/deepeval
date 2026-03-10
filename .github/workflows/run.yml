@@ -23,7 +23,11 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Optimize prompt (generates optimized_prompt.json)
+      - name: Create results directory
+        working-directory: src
+        run: mkdir -p results
+
+      - name: Optimize prompt (generates results/optimized_prompt.json)
         working-directory: src
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -34,17 +38,17 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           CONFIDENT_AI_API_KEY: ${{ secrets.CONFIDENT_AI_API_KEY }}
-        run: deepeval test run test_run_experiment.py
+        run: python test_run_experiment.py
 
       - name: Show experiment results
         working-directory: src
-        run: cat results.json
+        run: cat results/results.json
 
       - name: Upload results
         uses: actions/upload-artifact@v4
         with:
           name: experiment-results
-          path: src/results.json
+          path: src/results/
 
   security:
     name: Run Security Tests
@@ -60,19 +64,23 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Create results directory
+        working-directory: src
+        run: mkdir -p results
+
       - name: Run security tests
         working-directory: src
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           CONFIDENT_AI_API_KEY: ${{ secrets.CONFIDENT_AI_API_KEY }}
-        run: deepeval test run test_run_security.py
+        run: python test_run_security.py
 
       - name: Show security results
         working-directory: src
-        run: cat security_results.json
+        run: cat results/security_results.json
 
       - name: Upload security results
         uses: actions/upload-artifact@v4
         with:
           name: security-results
-          path: src/security_results.json
+          path: src/results/

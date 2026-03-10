@@ -9,6 +9,7 @@ Answer:"""
 
 PROMPT_1_CONFIG = {
     "name": "Prompt 1 — Simples",
+    "temperature": 1.0,
     "system": PROMPT_1_SYSTEM,
     "template": PROMPT_1_TEMPLATE,
     "description": "Prompt minimalista, sem restrições sobre uso do contexto.",

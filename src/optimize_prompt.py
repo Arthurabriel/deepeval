@@ -6,7 +6,7 @@ from prompts import PROMPT_1_CONFIG
 from dataset import GOLDEN_DATASET
 from knowledge_base import retrieve_context
 
-OUTPUT_FILE = "optimized_prompt.json"
+OUTPUT_FILE = "results/optimized_prompt.json"
 
 
 def build_examples() -> list[dict]:

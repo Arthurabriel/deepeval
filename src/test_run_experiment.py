@@ -5,6 +5,7 @@ from openai import OpenAI
 
 import deepeval
 from deepeval import evaluate
+from deepeval.evaluate.configs import AsyncConfig, DisplayConfig, ErrorConfig
 from deepeval.test_case import LLMTestCase
 from deepeval.metrics import (
     AnswerRelevancyMetric,
@@ -60,7 +61,7 @@ def generate_answer(prompt_config: dict, question: str, context_chunks: list[str
     return response.choices[0].message.content.strip()
 
 def get_optimized_prompt() -> dict:
-    optimized_file = "optimized_prompt.json"
+    optimized_file = "results/optimized_prompt.json"
 
 
     with open(optimized_file, "r", encoding="utf-8") as f:
@@ -109,8 +110,9 @@ def evaluate_experiment(test_cases: list[LLMTestCase], experiment_name: str) -> 
     results = evaluate(
         test_cases=test_cases,
         metrics=metrics,
-        run_async=False,
-        print_results=False,
+        async_config=AsyncConfig(run_async=True, max_concurrent=3),
+        display_config=DisplayConfig(print_results=False),
+        error_config=ErrorConfig(ignore_errors=True),
     )
 
     # Agrega scores por métrica
@@ -161,9 +163,9 @@ def print_report(all_results: dict):
     print(f"{'='*70}")
 
     # Salva JSON para consulta
-    with open("results.json", "w", encoding="utf-8") as f:
+    with open("results/results.json", "w", encoding="utf-8") as f:
         json.dump(all_results, f, indent=2, ensure_ascii=False)
-    print("\n💾 Resultados salvos em results.json")
+    print("\n💾 Resultados salvos em results/results.json")
 
 
 # ------------------------------------------------------------------------------
@@ -185,13 +187,17 @@ def main():
     all_results = {}
 
     for prompt_config, exp_name in experiments:
-        test_cases = run_experiment(prompt_config, exp_name)
-        scores = evaluate_experiment(test_cases, exp_name)
-        all_results[exp_name] = scores
+        try:
+            test_cases = run_experiment(prompt_config, exp_name)
+            scores = evaluate_experiment(test_cases, exp_name)
+            all_results[exp_name] = scores
 
-        print(f"\n  Scores médios — {exp_name}:")
-        for metric, score in scores.items():
-            print(f"    {metric}: {score:.3f}")
+            print(f"\n  Scores médios — {exp_name}:")
+            for metric, score in scores.items():
+                print(f"    {metric}: {score:.3f}")
+        except Exception as e:
+            print(f"\n  ❌ Erro em {exp_name}: {e}")
+            all_results[exp_name] = {}
 
     print_report(all_results)
 

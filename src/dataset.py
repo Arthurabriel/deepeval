@@ -112,4 +112,30 @@ GOLDEN_DATASET = [
             get_chunk("integration_definition"),
         ],
     },
+    {
+        "id": "q8",
+        "input": "Quais são as ferramentas mais usadas para realizar testes de carga e estresse em aplicações web?",
+        "expected_output": (
+            "O contexto fornecido não contém informações sobre ferramentas para testes de carga e estresse."
+        ),
+        "retrieval_context": [
+            get_chunk("acceptance_definition"),
+            get_chunk("integration_strategies"),
+        ],
+    },
+    {
+        "id": "q9",
+        "input": "Como o BDD ajuda na comunicação entre as equipes de negócio e desenvolvimento?",
+        "expected_output": (
+            "O BDD ajuda criando um entendimento compartilhado entre as equipes de negócio, "
+            "desenvolvimento e QA. Ele foca em descobrir, discutir e validar os comportamentos "
+            "esperados do sistema, servindo como uma ponte entre os requisitos de negócio e a "
+            "implementação técnica."
+        ),
+        "retrieval_context": [
+            get_chunk("integration_definition"), 
+            get_chunk("model_v"),                
+            get_chunk("bdd"),                    
+        ],
+    }
 ]

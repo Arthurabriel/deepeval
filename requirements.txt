@@ -1,3 +1,4 @@
 deepeval
 openai
 python-dotenv
+google-genai

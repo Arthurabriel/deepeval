@@ -1,11 +1,11 @@
 import os
 import json
+import pytest
 from dotenv import load_dotenv
-from openai import OpenAI
+from google import genai
+from google.genai import types
 
-import deepeval
-from deepeval import evaluate
-from deepeval.evaluate.configs import AsyncConfig, DisplayConfig, ErrorConfig
+from deepeval import assert_test
 from deepeval.test_case import LLMTestCase
 from deepeval.metrics import (
     AnswerRelevancyMetric,
@@ -14,197 +14,127 @@ from deepeval.metrics import (
     ContextualRecallMetric,
     ContextualPrecisionMetric,
 )
+from deepeval.models import GeminiModel
 
 from dataset import GOLDEN_DATASET
 from prompts import PROMPT_1_CONFIG, PROMPT_2_CONFIG, PROMPT_3_CONFIG, PROMPT_4_CONFIG
-from knowledge_base import retrieve_context
 
+# ------------------------------------------------------------------------------
+# SETUP & CONFIGURAÇÃO
+# ------------------------------------------------------------------------------
 load_dotenv()
 
-client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-MODEL = "gpt-4o-mini"  # troque para "gpt-4o" se quiser resultados mais robustos
+GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
+if not GOOGLE_API_KEY:
+    raise ValueError("GOOGLE_API_KEY não encontrada no arquivo .env")
 
-CONFIDENT_API_KEY = os.environ.get("CONFIDENT_AI_API_KEY")
-if CONFIDENT_API_KEY:
-    deepeval.login_with_confident_api_key(CONFIDENT_API_KEY)
+client = genai.Client(api_key=GOOGLE_API_KEY)
+MODEL_NAME = "gemini-2.5-flash"
 
+# Instancia o Juiz
+gemini_judge = GeminiModel(
+    model=MODEL_NAME,
+    api_key=GOOGLE_API_KEY,
+    temperature=0
+)
 
-def get_metrics():
-    return [
-        AnswerRelevancyMetric(threshold=0.7, model="gpt-4o-mini", verbose_mode=False),
-        FaithfulnessMetric(threshold=0.7, model="gpt-4o-mini", verbose_mode=False),
-        HallucinationMetric(threshold=0.5, model="gpt-4o-mini", verbose_mode=False),
-        ContextualRecallMetric(threshold=0.7, model="gpt-4o-mini", verbose_mode=False),
-        ContextualPrecisionMetric(threshold=0.7, model="gpt-4o-mini", verbose_mode=False),
-    ]
+quality_metrics = [
+    AnswerRelevancyMetric(threshold=0.7, model=gemini_judge, verbose_mode=False),
+    FaithfulnessMetric(threshold=0.7, model=gemini_judge, verbose_mode=False),
+    HallucinationMetric(threshold=0.5, model=gemini_judge, verbose_mode=False),
+    ContextualRecallMetric(threshold=0.7, model=gemini_judge, verbose_mode=False),
+    ContextualPrecisionMetric(threshold=0.7, model=gemini_judge, verbose_mode=False),
+]
 
-def generate_answer(prompt_config: dict, question: str, context_chunks: list[str]) -> str:
-    context_text = "\n\n---\n\n".join(context_chunks)
-
-    user_message = prompt_config["template"].format(
-        context=context_text,
-        question=question,
-    )
-
-    messages = []
-    if prompt_config.get("system"):
-        messages.append({"role": "system", "content": prompt_config["system"]})
-    messages.append({"role": "user", "content": user_message})
-
-    response = client.chat.completions.create(
-        model=MODEL,
-        messages=messages,
-        temperature=prompt_config["temperature"],
-        max_tokens=512,
-    )
-
-    return response.choices[0].message.content.strip()
+# ------------------------------------------------------------------------------
+# FUNÇÕES DE APOIO
+# ------------------------------------------------------------------------------
 
 def get_optimized_prompt() -> dict:
     optimized_file = "results/optimized_prompt.json"
-
+    if not os.path.exists(optimized_file):
+        return PROMPT_4_CONFIG
 
     with open(optimized_file, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    optimized = data["optimized_prompt"]
-    PROMPT_4_CONFIG["system"] = optimized
+    PROMPT_4_CONFIG["system"] = data["optimized_prompt"]
     PROMPT_4_CONFIG["template"] = "{context}\n\nQuestion: {question}\n\nAnswer:"
     PROMPT_4_CONFIG["temperature"] = data.get("temperature", 0.3)
-
     return PROMPT_4_CONFIG
 
-def run_experiment(prompt_config: dict, experiment_name: str) -> list[LLMTestCase]:
-    print(f"\n{'='*60}")
-    print(f"🧪 Experimento: {experiment_name}")
-    print(f"   {prompt_config['description']}")
-    print(f"   Temperatura: {prompt_config['temperature']}")
-    print(f"{'='*60}")
+PROMPT_4_OTIMIZADO = get_optimized_prompt()
 
-    test_cases = []
+def generate_answer(prompt_config: dict, question: str, context_chunks: list[str]) -> str:
+    context_text = "\n\n---\n\n".join(context_chunks)
+    user_message = prompt_config["template"].format(context=context_text, question=question)
 
-    for entry in GOLDEN_DATASET:
-        print(f"  → Gerando resposta para: {entry['input'][:60]}...")
-
-        answer = generate_answer(
-            prompt_config=prompt_config,
-            question=entry["input"],
-            context_chunks=entry["retrieval_context"],
-        )
-
-        test_case = LLMTestCase(
-            input=entry["input"],
-            actual_output=answer,
-            expected_output=entry["expected_output"],
-            retrieval_context=entry["retrieval_context"],
-            context=entry["retrieval_context"],
-        )
-        test_cases.append(test_case)
-
-    return test_cases
-
-def evaluate_experiment(test_cases: list[LLMTestCase], experiment_name: str) -> dict:
-    print(f"\n📊 Avaliando: {experiment_name}...")
-
-    metrics = get_metrics()
-    results = evaluate(
-        test_cases=test_cases,
-        metrics=metrics,
-        async_config=AsyncConfig(run_async=True, max_concurrent=3),
-        display_config=DisplayConfig(print_results=False),
-        error_config=ErrorConfig(ignore_errors=True),
-    )
-
-    # Agrega scores por métrica
-    metric_scores = {}
-    for test_result in results.test_results:
-        for metric_data in test_result.metrics_data:
-            name = metric_data.name
-            score = metric_data.score or 0.0
-            if name not in metric_scores:
-                metric_scores[name] = []
-            metric_scores[name].append(score)
-
-    avg_scores = {
-        name: round(sum(scores) / len(scores), 3)
-        for name, scores in metric_scores.items()
+    config_kwargs = {
+        "temperature": prompt_config.get("temperature", 0.2),
+        "max_output_tokens": 512,
     }
 
-    return avg_scores
+    if prompt_config.get("system"):
+        config_kwargs["system_instruction"] = prompt_config["system"]
+
+    response = client.models.generate_content(
+        model=MODEL_NAME,
+        contents=user_message,
+        config=types.GenerateContentConfig(**config_kwargs),
+    )
+    return response.text.strip()
+
+@pytest.mark.parametrize("case_data", GOLDEN_DATASET)
+def test_prompt_1_simples(case_data):
+    actual_output = generate_answer(PROMPT_1_CONFIG, case_data["input"], case_data["retrieval_context"])
+    
+    test_case = LLMTestCase(
+        input=case_data["input"],
+        actual_output=actual_output,
+        expected_output=case_data["expected_output"],
+        retrieval_context=case_data["retrieval_context"],
+        context=case_data["retrieval_context"]
+    )
+    assert_test(test_case, quality_metrics)
 
 
-def print_report(all_results: dict):
-    print(f"\n{'='*70}")
-    print("📈 RELATÓRIO FINAL — Comparação entre os 4 Prompts")
-    print(f"{'='*70}")
-
-    metric_names = list(next(iter(all_results.values())).keys())
-    col_width = 28
-
-    # Cabeçalho
-    header = f"{'Métrica':<{col_width}}"
-    for exp_name in all_results:
-        short = exp_name.split("—")[0].strip()
-        header += f"{short:>14}"
-    print(header)
-    print("-" * (col_width + 14 * len(all_results)))
-
-    # Linhas
-    for metric in metric_names:
-        row = f"{metric:<{col_width}}"
-        for exp_name, scores in all_results.items():
-            val = scores.get(metric, 0.0)
-            emoji = "✅" if val >= 0.7 else ("⚠️ " if val >= 0.5 else "❌")
-            row += f"{emoji} {val:>8.3f}  "
-        print(row)
-
-    print(f"\n{'='*70}")
-    print("Legenda: ✅ ≥ 0.7 (bom)  |  ⚠️  0.5–0.7 (atenção)  |  ❌ < 0.5 (ruim)")
-    print(f"{'='*70}")
-
-    # Salva JSON para consulta
-    with open("results/results.json", "w", encoding="utf-8") as f:
-        json.dump(all_results, f, indent=2, ensure_ascii=False)
-    print("\n💾 Resultados salvos em results/results.json")
+@pytest.mark.parametrize("case_data", GOLDEN_DATASET)
+def test_prompt_2_alta_temperatura(case_data):
+    actual_output = generate_answer(PROMPT_2_CONFIG, case_data["input"], case_data["retrieval_context"])
+    
+    test_case = LLMTestCase(
+        input=case_data["input"],
+        actual_output=actual_output,
+        expected_output=case_data["expected_output"],
+        retrieval_context=case_data["retrieval_context"],
+        context=case_data["retrieval_context"]
+    )
+    assert_test(test_case, quality_metrics)
 
 
-# ------------------------------------------------------------------------------
-# Main
-# ------------------------------------------------------------------------------
-def main():
-    print("\n🚀 DeepEval Demo — V&V UFCG")
-    print("   Comparando 4 estratégias de prompt em RAG sobre material de V&V\n")
-
-    get_optimized_prompt()
-
-    experiments = [
-        (PROMPT_1_CONFIG, "Prompt 1 — Simples"),
-        (PROMPT_2_CONFIG, "Prompt 2 — Alta Temperatura"),
-        (PROMPT_3_CONFIG, "Prompt 3 — Padrão da Indústria"),
-        (PROMPT_4_CONFIG, "Prompt 4 — Otimizado pelo DeepEval"),
-    ]
-
-    all_results = {}
-
-    for prompt_config, exp_name in experiments:
-        try:
-            test_cases = run_experiment(prompt_config, exp_name)
-            scores = evaluate_experiment(test_cases, exp_name)
-            all_results[exp_name] = scores
-
-            print(f"\n  Scores médios — {exp_name}:")
-            for metric, score in scores.items():
-                print(f"    {metric}: {score:.3f}")
-        except Exception as e:
-            print(f"\n  ❌ Erro em {exp_name}: {e}")
-            all_results[exp_name] = {}
-
-    print_report(all_results)
-
-    if CONFIDENT_API_KEY:
-        print("\n🌐 Resultados enviados para o dashboard do Confident AI!")
-        print("   Acesse: https://app.confident-ai.com")
+@pytest.mark.parametrize("case_data", GOLDEN_DATASET)
+def test_prompt_3_padrao_industria(case_data):
+    actual_output = generate_answer(PROMPT_3_CONFIG, case_data["input"], case_data["retrieval_context"])
+    
+    test_case = LLMTestCase(
+        input=case_data["input"],
+        actual_output=actual_output,
+        expected_output=case_data["expected_output"],
+        retrieval_context=case_data["retrieval_context"],
+        context=case_data["retrieval_context"]
+    )
+    assert_test(test_case, quality_metrics)
 
 
-if __name__ == "__main__":
-    main()
+@pytest.mark.parametrize("case_data", GOLDEN_DATASET)
+def test_prompt_4_otimizado(case_data):
+    actual_output = generate_answer(PROMPT_4_OTIMIZADO, case_data["input"], case_data["retrieval_context"])
+    
+    test_case = LLMTestCase(
+        input=case_data["input"],
+        actual_output=actual_output,
+        expected_output=case_data["expected_output"],
+        retrieval_context=case_data["retrieval_context"],
+        context=case_data["retrieval_context"]
+    )
+    assert_test(test_case, quality_metrics)

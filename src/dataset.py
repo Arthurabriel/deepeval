@@ -133,9 +133,9 @@ GOLDEN_DATASET = [
             "implementação técnica."
         ),
         "retrieval_context": [
+            get_chunk("bdd"),                    
             get_chunk("integration_definition"), 
             get_chunk("model_v"),                
-            get_chunk("bdd"),                    
         ],
     }
 ]

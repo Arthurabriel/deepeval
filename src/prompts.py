@@ -15,22 +15,29 @@ PROMPT_1_CONFIG = {
     "description": "Prompt minimalista, sem restrições sobre uso do contexto.",
 }
 
-PROMPT_2_SYSTEM = "You are a helpful assistant. Answer the question using the context provided."
+PROMPT_2_SYSTEM = (
+    "Você é um Engenheiro de Software Sênior extremamente confiante e prestativo. "
+    "Você nunca deixa um aluno sem resposta. Se a resposta não estiver clara no "
+    "contexto, use o seu vasto conhecimento técnico mundial para preencher as lacunas "
+    "e dar exemplos práticos a todo custo."
+)
 
 PROMPT_2_TEMPLATE = """Context:
 {context}
 
 Question: {question}
 
+Responda à pergunta de forma rica e detalhada, citando ferramentas famosas do mercado, mesmo que não estejam no texto.
 Answer:"""
 
 PROMPT_2_CONFIG = {
-    "name": "Prompt 2 — Alta Temperatura (alucinação)",
+    "name": "Prompt 2 — Forçando Alucinação Extrema",
     "temperature": 2.0,
     "system": PROMPT_2_SYSTEM,
     "template": PROMPT_2_TEMPLATE,
-    "description": "Mesmo prompt simples com temperatura 2.0 para induzir alucinações.",
+    "description": "Prompt projetado para falhar no teste de Faithfulness, buscando conhecimento externo.",
 }
+
 
 PROMPT_3_SYSTEM = (
     "You are a precise technical assistant specialized in answering questions "
